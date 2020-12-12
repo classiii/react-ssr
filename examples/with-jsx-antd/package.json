@@ -7,12 +7,12 @@
   "dependencies": {
     "@react-ssr/core": "latest",
     "@react-ssr/express": "latest",
-    "antd": "^4.3.3",
+    "antd": "^4.9.2",
     "express": "^4.17.1",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1"
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1"
   },
   "devDependencies": {
-    "babel-plugin-import": "^1.13.0"
+    "babel-plugin-import": "^1.13.3"
   }
 }
