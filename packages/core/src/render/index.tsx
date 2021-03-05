@@ -9,9 +9,11 @@ import Document from '../components/Document';
 import {
   existsSync,
   isProd,
-  ssrConfig,
+  getSsrConfig,
   getEngine,
   getPageId,
+  AppConfig,
+  Config
 } from '../helpers';
 
 require('@babel/register')({
@@ -50,29 +52,33 @@ require('@babel/register')({
   ].filter(Boolean),
 });
 
-const cwd = process.cwd();
-const ext = `.${getEngine()}`;
-
 const DocumentContext = require('./document-context');
-const userDocumentPath = path.join(cwd, ssrConfig.viewsDir, `_document${ext}`);
-let DocumentComponent: any;
-if (existsSync(userDocumentPath)) {
-  const UserDocument = require(userDocumentPath);
-  DocumentComponent = UserDocument.default || UserDocument;
-} else {
-  DocumentComponent = Document;
+
+const getDocumentComponent = (appDir: string, viewsDir: string, ext: string): any => {
+  const userDocumentPath = path.join(appDir, viewsDir, `_document${ext}`);
+  let DocumentComponent: any;
+  if (existsSync(userDocumentPath)) {
+    const UserDocument = require(userDocumentPath);
+    DocumentComponent = UserDocument.default || UserDocument;
+  } else {
+    DocumentComponent = Document;
+  }
+
+  return DocumentComponent;
 }
 
-const userAppPath = path.join(cwd, ssrConfig.viewsDir, `_app${ext}`);
-let AppComponent: any;
-if (existsSync(userAppPath)) {
-  const UserAppComponent = require(userAppPath);
-  AppComponent = UserAppComponent.default || UserAppComponent;
-} else {
-  AppComponent = App;
+const getAppComponent = (appDir: string, viewsDir: string, ext: string): any => {
+  const userAppPath = path.join(appDir, viewsDir, `_app${ext}`);
+  let AppComponent: any;
+  if (existsSync(userAppPath)) {
+    const UserAppComponent = require(userAppPath);
+    AppComponent = UserAppComponent.default || UserAppComponent;
+  } else {
+    AppComponent = App;
+  }
 }
 
-const getRenderToStringMethod = async () => {
+const getRenderToStringMethod = async (ssrConfig: Config) => {
   let method;
   switch (ssrConfig.id) {
     case 'antd':
@@ -100,9 +106,14 @@ const compressProps = (props: any) => {
   return URLSafeBase64.encode(compressed);
 }
 
-export default async function render(file: string, props: any): Promise<string> {
-  const pageId = getPageId(file, '_');
-  const cachePath = path.join(cwd, ssrConfig.distDir, `${pageId}.html`);
+export default async function render(file: string, props: any, confg: AppConfig): Promise<string> {
+  const { appDir } = confg;
+
+  const ssrConfig = getSsrConfig(appDir);
+  const pageId = getPageId(appDir, file, '_');
+  const ext = `.${getEngine(appDir)}`;
+
+  const cachePath = path.join(appDir, ssrConfig.distDir, `${pageId}.html`);
   if (isProd() && existsSync(cachePath)) {
     return fs.readFileSync(cachePath).toString();
   }
@@ -111,8 +122,12 @@ export default async function render(file: string, props: any): Promise<string> 
   Page = Page.default || Page;
 
   let html;
+
+  const AppComponent: any = getAppComponent(appDir, ssrConfig.viewsDir, ext);
+  const DocumentComponent: any = getAppComponent(appDir, ssrConfig.viewsDir, ext);
+
   try {
-    html = (await getRenderToStringMethod())(
+    html = (await getRenderToStringMethod(ssrConfig))(
       <DocumentContext.Provider value={<AppComponent children={Page} {...props} />}>
         <DocumentComponent />
       </DocumentContext.Provider>,
@@ -127,7 +142,7 @@ export default async function render(file: string, props: any): Promise<string> 
     return isProd() ? '' : (err.stack || err);
   } finally {
     if (isProd() && !existsSync(cachePath)) {
-      const viewPath = slash(file.replace(path.join(cwd, ssrConfig.viewsDir), '').replace(ext, '')).slice(1);
+      const viewPath = slash(file.replace(path.join(appDir, ssrConfig.viewsDir), '').replace(ext, '')).slice(1);
       if (ssrConfig.staticViews.includes(viewPath)) {
         fs.outputFileSync(cachePath, html);
       }

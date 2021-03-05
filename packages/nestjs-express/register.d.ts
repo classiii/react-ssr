@@ -1,5 +1,9 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 
-declare function register(app: NestExpressApplication): Promise<void>;
+interface AppConfig {
+  appDir: string;
+}
+
+declare function register(app: NestExpressApplication, config?: AppConfig): Promise<void>;
 
 export = register;

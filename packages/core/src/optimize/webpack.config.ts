@@ -6,16 +6,15 @@ import OptimizeCSSAssetsPlugin from 'optimize-css-assets-webpack-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 import {
   existsSync,
-  ssrConfig,
   isProd,
+  AppConfig,
+  getSsrConfig
 } from '../helpers';
 
-const cwd = process.cwd();
-
-const getBabelrc = (): string | undefined => {
-  if (existsSync(path.join(cwd, '.babelrc'))) return path.join(cwd, '.babelrc');
-  if (existsSync(path.join(cwd, '.babelrc.js'))) return path.join(cwd, '.babelrc.js');
-  if (existsSync(path.join(cwd, 'babel.config.js'))) return path.join(cwd, 'babel.config.js');
+const getBabelrc = (appDir: string): string | undefined => {
+  if (existsSync(path.join(appDir, '.babelrc'))) return path.join(appDir, '.babelrc');
+  if (existsSync(path.join(appDir, '.babelrc.js'))) return path.join(appDir, '.babelrc.js');
+  if (existsSync(path.join(appDir, 'babel.config.js'))) return path.join(appDir, 'babel.config.js');
   return path.join(__dirname, '../../lib/babel.js');
 };
 
@@ -53,13 +52,16 @@ const prodConfig: webpack.Configuration = {
   ],
 };
 
-export const configureWebpack = (entry: webpack.Entry): webpack.Configuration => {
+export const configureWebpack = (entry: webpack.Entry, appConfig: AppConfig): webpack.Configuration => {
+  const { appDir } = appConfig;
+  const { distDir, webpack } = getSsrConfig(appDir);
+
   let config: webpack.Configuration = {
     mode: 'development',
     devtool: isProd() ? false : 'eval-source-map',
     entry,
     output: {
-      path: path.join(cwd, ssrConfig.distDir),
+      path: path.join(appDir, distDir),
       filename: '[name].js',
     },
     resolve: {
@@ -74,7 +76,7 @@ export const configureWebpack = (entry: webpack.Entry): webpack.Configuration =>
             loader: require.resolve('babel-loader'),
             options: {
               cacheDirectory: true,
-              extends: getBabelrc(),
+              extends: getBabelrc(appDir),
             },
           },
         },
@@ -84,7 +86,7 @@ export const configureWebpack = (entry: webpack.Entry): webpack.Configuration =>
             {
               loader: MiniCssExtractPlugin.loader,
               options: {
-                publicPath: path.join(cwd, ssrConfig.distDir),
+                publicPath: path.join(appDir, distDir),
                 hmr: !isProd(),
                 reloadAll: true,
               },
@@ -100,7 +102,7 @@ export const configureWebpack = (entry: webpack.Entry): webpack.Configuration =>
             {
               loader: MiniCssExtractPlugin.loader,
               options: {
-                publicPath: path.join(cwd, ssrConfig.distDir),
+                publicPath: path.join(appDir, distDir),
                 hmr: !isProd(),
                 reloadAll: true,
               },
@@ -131,9 +133,9 @@ export const configureWebpack = (entry: webpack.Entry): webpack.Configuration =>
     config = merge(config, prodConfig);
   }
 
-  if (ssrConfig.webpack) {
-    if (typeof ssrConfig.webpack === 'function') {
-      config = ssrConfig.webpack(config, isProd() ? 'production' : 'development');
+  if (webpack) {
+    if (typeof webpack === 'function') {
+      config = webpack(config, isProd() ? 'production' : 'development');
     } else {
       console.warn('[ warn ] ssr.config.js#webpack must be a function');
     }

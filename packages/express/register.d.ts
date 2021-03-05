@@ -1,5 +1,9 @@
 import express from 'express';
 
-declare function register(app: express.Application): Promise<void>;
+interface AppConfig {
+  appDir: string;
+}
+
+declare function register(app: express.Application, config?: AppConfig): Promise<void>;
 
 export = register;

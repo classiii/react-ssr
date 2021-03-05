@@ -8,21 +8,23 @@ import { configureWebpack } from './webpack.config';
 import { getEntry } from './helpers';
 import {
   existsSync,
-  ssrConfig,
+  getSsrConfig,
   getPageId,
+  AppConfig,
+  Config
 } from '../helpers';
-
-const cwd = process.cwd();
 
 const ufs = require('unionfs').ufs;
 const memfs = new MemoryFileSystem();
 ufs.use(fs).use(memfs);
 
-export default async (app: express.Application): Promise<void> => {
-  fse.removeSync(path.join(cwd, ssrConfig.distDir));
+export default async (app: express.Application, config: AppConfig): Promise<void> => {
+  const { appDir } = config;
+  const ssrConfig: Config = getSsrConfig(appDir);
+  fse.removeSync(path.join(appDir, ssrConfig.distDir));
 
-  const [entry, entryPages] = await getEntry(memfs);
-  const webpackConfig: webpack.Configuration = configureWebpack(entry);
+  const [entry, entryPages] = await getEntry(memfs, appDir);
+  const webpackConfig: webpack.Configuration = configureWebpack(entry, config);
   const compiler: webpack.Compiler = webpack(webpackConfig);
   compiler.inputFileSystem = ufs;
 
@@ -33,17 +35,17 @@ export default async (app: express.Application): Promise<void> => {
 
       for (let i = 0; i < entryPages.length; i++) {
         const page = entryPages[i];
-        const pageId = getPageId(page, '_');
+        const pageId = getPageId(appDir, page, '_');
 
         app.use(`/_react-ssr/${pageId}.css`, (req, res) => {
-          const filename = path.join(cwd, ssrConfig.distDir, `${pageId}.css`);
+          const filename = path.join(appDir, ssrConfig.distDir, `${pageId}.css`);
           const style = existsSync(filename) ? fs.readFileSync(filename).toString() : '';
           res.writeHead(200, { 'Content-Type': 'text/css' });
           res.end(style, 'utf-8');
         });
 
         app.use(`/_react-ssr/${pageId}.js`, (req, res) => {
-          const filename = path.join(cwd, ssrConfig.distDir, `${pageId}.js`);
+          const filename = path.join(appDir, ssrConfig.distDir, `${pageId}.js`);
           const script = fs.readFileSync(filename).toString();
           res.status(200).type('.js').send(script);
         });
